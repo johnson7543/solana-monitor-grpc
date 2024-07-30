@@ -1,7 +1,10 @@
 package processor
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/rpcpool/yellowstone-grpc/examples/golang/model"
@@ -19,6 +22,8 @@ func HandleTransaction(resp *pb.SubscribeUpdate, ownerSet map[string]struct{}) {
 		log.Printf("%+v Received Transaction: %+v\n", formattedTime, update.Transaction)
 
 		if update.Transaction.Transaction.Meta.PreTokenBalances != nil {
+			go writeToFile(formattedTime, resp)
+
 			startTime := time.Now()
 			transactions := AnalyzeBalances(update.Transaction.Transaction.Meta.PreTokenBalances, update.Transaction.Transaction.Meta.PostTokenBalances, ownerSet)
 			endTime := time.Now()
@@ -34,6 +39,11 @@ func HandleTransaction(resp *pb.SubscribeUpdate, ownerSet map[string]struct{}) {
 
 // AnalyzeBalances analyzes the balances before and after a transaction
 func AnalyzeBalances(preBalances, postBalances []*pb.TokenBalance, ownerSet map[string]struct{}) []model.Transaction {
+	if len(preBalances) == 0 || len(postBalances) == 0 {
+		log.Printf("Empty pre or post balances\n")
+		return nil
+	}
+
 	ownerBalances := make(map[string]map[string]float64)
 	transactions := []model.Transaction{}
 
@@ -50,6 +60,10 @@ func AnalyzeBalances(preBalances, postBalances []*pb.TokenBalance, ownerSet map[
 	// Process postBalances and compare
 	for _, balance := range postBalances {
 		if _, exists := ownerSet[balance.Owner]; exists {
+			if ownerBalances[balance.Owner] == nil {
+				ownerBalances[balance.Owner] = make(map[string]float64)
+			}
+
 			preAmount := ownerBalances[balance.Owner][balance.Mint]
 			postAmount := balance.UiTokenAmount.UiAmount
 			ownerBalances[balance.Owner][balance.Mint] = postAmount
@@ -72,4 +86,19 @@ func AnalyzeBalances(preBalances, postBalances []*pb.TokenBalance, ownerSet map[
 	}
 
 	return transactions
+}
+
+func writeToFile(formattedTime string, resp *pb.SubscribeUpdate) {
+	filename := fmt.Sprintf("response_%s.json", formattedTime)
+
+	jsonData, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Error marshalling response to JSON: %v", err)
+		return
+	}
+
+	f, _ := os.Create(filename)
+	defer f.Close()
+
+	_, _ = f.Write(jsonData)
 }
