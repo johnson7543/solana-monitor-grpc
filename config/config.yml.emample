@@ -1,0 +1,10 @@
+address: hostname:port
+insecureConnection: false
+token: xxxxxxxxxxxxxxxxxxxxx
+subscriptions:
+  transaction:
+    enable: true
+    transactionsVote: false
+    transactionsFailed: false
+    transactionsAccountsInclude:
+      - 3pHhYnUauzirkVPQ7bNHUdsePuxdcy6xuuSEycanTuAS
